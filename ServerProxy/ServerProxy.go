@@ -2,8 +2,8 @@ package main
 
 import (
 	//	"bytes"
-	"dns-master"
 	"flag"
+	"github.com/miekg/dns"
 	"io/ioutil"
 	"log"
 	"math/rand"
