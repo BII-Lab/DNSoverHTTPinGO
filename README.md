@@ -19,9 +19,9 @@ Construction
 
 To compile the code, make sure your have install golang 1.4 version and  already compiled go dns lib written by miekg(https://github.com/miekg/dns).
 
-go get github.com/BII-Lab/DNSoverHTTPinGO/
-go build github.com/BII-Lab/DNSoverHTTPinGO/ClientProxy
-go build github.com/BII-Lab/DNSoverHTTPinGO/ServerProxy
+	go get github.com/BII-Lab/DNSoverHTTPinGO/
+	go build github.com/BII-Lab/DNSoverHTTPinGO/ClientProxy
+	go build github.com/BII-Lab/DNSoverHTTPinGO/ServerProxy
 
 Server Installation
 -------------------
@@ -29,8 +29,13 @@ Server Installation
 The server proxy will need a working name server configuration on your server. The server should be reachable by UDP and TCP, and you should have a clear ICMP path to it, as well as full MTU (1500 octets or larger) and the ability to receive fragmented UDP (to make EDNS0 usable.)
 
 1.compile ServerProxy.
+	
+	compile ServerProxy
+
 2.make sure you have a working resolver.
-3.run the ServerProxy as ./ServerProxy -proxy="[your resolver ip address]"
+3.run the ServerProxy as 
+	
+	./ServerProxy -proxy="[your resolver ip address]"
 
 Client Installation
 -------------------
