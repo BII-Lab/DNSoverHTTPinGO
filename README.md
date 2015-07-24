@@ -42,8 +42,7 @@ Client Installation
 
 The ClientProxy will listen on the port assigned(defaut port is 53). And it must also be told where are which type proxy service to connect to. If you want to connect to the FCGI proxy server(https://github.com/BII-Lab/DNSoverHTTP/tree/master/proxy_dns_fcgi) your need add a -support_version option. Both domain name or ip address for server proxy is acceptable. If you use a domain name, you need to set a resolver's IP address as a start point.
 
-1. compile ClientProxy.
-	
+1. compile ClientProxy
 	compile ClientProxy
 
 2. If you want to redirect all you normal DNS traffic to the proxy, configure your /etc/resolv.conf. Set nameserver to 127.0.0.1.(optional)
