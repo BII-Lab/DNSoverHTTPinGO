@@ -1,4 +1,4 @@
-# goDNSoverHTTP
+﻿# goDNSoverHTTP
 
 Introduction
 ------------
@@ -17,8 +17,10 @@ which DNS on TCP/53 does not have. Lastly, HTTPS will work, giving privacy.
 Construction
 ------------
 
-To compile the code, make sure your have install golang 1.4 version and  already compiled go dns lib written by miekg(https://github.com/miekg/dns).
-
+To compile the code, make sure your have install golang 1.4 version and  already compiled go dns lib written by miekg(https://github.com/miekg/dns).You can find introduction's in miekg's github.To simply get and compile miekg's package in golang, just run:
+	go get github.com/miekg/dns
+	go build github.com/miekg/dns
+Then you can compile the code in this repository by:
 	go get github.com/BII-Lab/DNSoverHTTPinGO/
 	go build github.com/BII-Lab/DNSoverHTTPinGO/ClientProxy
 	go build github.com/BII-Lab/DNSoverHTTPinGO/ServerProxy
