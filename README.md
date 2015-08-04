@@ -28,13 +28,13 @@ Server Installation
 
 The server proxy will need a working name server configuration on your server. The server should be reachable by UDP and TCP, and you should have a clear ICMP path to it, as well as full MTU (1500 octets or larger) and the ability to receive fragmented UDP (to make EDNS0 usable.)
 
-1.compile ServerProxy.
+1. compile ServerProxy.
 	
 	go build github.com/BII-Lab/DNSoverHTTPinGO/ServerProxy
 	
-2.make sure you have a working resolver.
+2. make sure you have a working resolver.
 
-3.run the ServerProxy as （listion to port 80 currently） 
+3. run the ServerProxy as （listion to port 80 currently） 
 	
 	./ServerProxy -proxy "[your upper resolver's ip address]"
 4. For more help information, you can use -h option
@@ -52,11 +52,11 @@ The ClientProxy will listen on the port assigned(defaut port is 53). And it must
 	
 2. If you want to redirect all you normal DNS traffic to the proxy, configure your /etc/resolv.conf. Set nameserver to 127.0.0.1.(optional)
 
-3. run ClientProxy to connect the ServerProxy. 
+3. run ClientProxy to connect the ServerProxy
 	
 	./ClientProxy -proxy "the domain or address of ServerProxy"
 
-4. Note that If you want to use domain as the arg for -proxy, the code will use a default resolver 114.114.114.114:53 for the resolution of the ServerProxy domain. You can also specify the resolver with --dns_server with "you prefered dns resolver ip:port".
+4. Note that If you want to use domain as the arg for -proxy, the code will use a default resolver 114.114.114.114:53 for the resolution of the ServerProxy domain. You can also specify the resolver with --dns_server with "you prefered dns resolver ip:port"
 
 	./ClientProxy -proxy "the domain or address of ServerProxy" -dns_server "8.8.8.8:53"
 	
