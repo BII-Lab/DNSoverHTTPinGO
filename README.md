@@ -29,16 +29,17 @@ Server Installation
 The server proxy will need a working name server configuration on your server. The server should be reachable by UDP and TCP, and you should have a clear ICMP path to it, as well as full MTU (1500 octets or larger) and the ability to receive fragmented UDP (to make EDNS0 usable.)
 
 1. compile ServerProxy.
-	
+
 	go build github.com/BII-Lab/DNSoverHTTPinGO/ServerProxy
 	
 2. make sure you have a working resolver.
 
-3. run the ServerProxy as （listion to port 80 currently） 
-	
+3. run the ServerProxy as (listion to port 80 by default) 
+
 	./ServerProxy -proxy "[your upper resolver's ip address]"
+
 4. For more help information, you can use -h option
-	
+
 	./ServeProxy -h
 
 Client Installation
