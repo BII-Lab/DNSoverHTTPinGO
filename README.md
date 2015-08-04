@@ -31,8 +31,9 @@ The server proxy will need a working name server configuration on your server. T
 1.compile ServerProxy.
 	
 	go build github.com/BII-Lab/DNSoverHTTPinGO/ServerProxy
-
+	
 2.make sure you have a working resolver.
+
 3.run the ServerProxy as （listion to port 80 currently） 
 	
 	./ServerProxy -proxy "[your upper resolver's ip address]"
