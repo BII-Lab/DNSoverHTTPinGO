@@ -1,18 +1,13 @@
-﻿#DNSoverHTTPinGO
+#DNSoverHTTPinGO
 
 Introduction
 ------------
+This proxy implementation is a follow－up works of DNSoverHTTP（https://github.com/BII-Lab/DNSoverHTTP）written in C. Compared with the previous version, this works provides:
 
-This proxy implementation is a follow－up works of DNSoverHTTP（https://github.com/BII-Lab/DNSoverHTTP）. Compared with the previous version, this works provides:
-
-1. a go version end point which can be totally compatible with the FastCGI－version server with -support_version option. 
-
-2. a go version Proxy server which optimized parallelizing with event-based lib. It should be noticed that this server is only compatible with the client in same repository without -support-version option
-
-The great advantage to this approach is that HTTP usually makes it through
-even the worst coffee shop or hotel room firewalls, since commerce may be at
-stake. We also benefit from HTTP's persistent TCP connection pool concept,
-which DNS on TCP/53 does not have. Lastly, HTTPS will work, giving privacy.
+1. A go version client proxy and server proxy which is indepentdent of web server(nginx or apache). That is to say the server proxy will listen to 80/443 and handle the http connect itself based on Golang lib.
+2. This Golang version using the event-based method resoloves the performance problem of threads on the proxy_dns_fcgi side in C version.
+3. The Go version client/server is implemented without resource name and with different content tpye. For compatible consideration, Go client can connect to FastCGI－version server with -support_version option. If you connect the go version proxy server, do not use -support_version option.
+4. In FastCGI-verion, the client should be told where to connect for its DNS proxy service with the "-s arg". It will cause a kind of *loop problem* if arg is a url like "http://proxy-dns.vix.su" and GW server happens to  use 127.0.0.1 as one of its /etc/resolv.conf nameservers. The Golang version correct it by using a speciall DNS request for the domain in the url firstly.
 
 Construction
 ------------
@@ -35,12 +30,15 @@ The server proxy will need a working name server configuration on your server. T
 
 1.compile ServerProxy.
 	
-	compile ServerProxy
+	go build github.com/BII-Lab/DNSoverHTTPinGO/ServerProxy
 
 2.make sure you have a working resolver.
-3.run the ServerProxy as 
+3.run the ServerProxy as （listion to port 80 currently） 
 	
-	./ServerProxy -proxy="[your resolver ip address]"
+	./ServerProxy -proxy "[your upper resolver's ip address]"
+4. For more help information, you can use -h option
+	
+	./ServeProxy -h
 
 Client Installation
 -------------------
@@ -49,22 +47,26 @@ The ClientProxy will listen on the port assigned(defaut port is 53). And it must
 
 1. compile ClientProxy.
 	
-	compile ClientProxy
+	go build github.com/BII-Lab/DNSoverHTTPinGO/ClientProxy
 	
 2. If you want to redirect all you normal DNS traffic to the proxy, configure your /etc/resolv.conf. Set nameserver to 127.0.0.1.(optional)
 	
-	(TODO: configuration command)
+3.run ClientProxy to connect the ServerProxy. 
 	
-3.run ClientProxy. 
-	
-	./ClientProxy -proxy="[240c:f:1:11::66]" -support_version.
+	./ClientProxy -proxy "the domain or address of ServerProxy"
 
+4. Note that If you want to use domain as the arg for -proxy, the code will use a default resolver 114.114.114.114:53 for the resolution of the ServerProxy domain. You can also specify the resolver with --dns_server with "you prefered dns resolver ip:port".
+
+	./ClientProxy -proxy "the domain or address of ServerProxy" -dns_server "8.8.8.8:53"
+	
+5. For more help information, you can use -h option
+	
+	./ClientProxy -h
 
 Testing
 -------
 
-Make sure you have a working "dig" command. If you started your client side
-dns_proxy service on 127.0.0.1, then you should be able to say:
+Make sure you have a working "dig" command. If you started your client side dns_proxy service on 127.0.0.1, then you should be able to say:
 
 	dig @127.0.0.1 www.yeti-dns.org aaaa
 
