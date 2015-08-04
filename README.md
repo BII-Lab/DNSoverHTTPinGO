@@ -50,8 +50,8 @@ The ClientProxy will listen on the port assigned(defaut port is 53). And it must
 	go build github.com/BII-Lab/DNSoverHTTPinGO/ClientProxy
 	
 2. If you want to redirect all you normal DNS traffic to the proxy, configure your /etc/resolv.conf. Set nameserver to 127.0.0.1.(optional)
-	
-3.run ClientProxy to connect the ServerProxy. 
+
+3. run ClientProxy to connect the ServerProxy. 
 	
 	./ClientProxy -proxy "the domain or address of ServerProxy"
 
