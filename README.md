@@ -4,7 +4,7 @@ Introduction
 ------------
 This proxy implementation is a follow－up works of DNSoverHTTP（https://github.com/BII-Lab/DNSoverHTTP）written in C. Compared with the previous version, this works provides:
 
-1. A Golang version client proxy and server proxy which is indepentdent of web server(nginx or apache). That is to say the server proxy will listen to 80/443 and handle the http connect itself based on Golang lib.
+1. A Golang version client proxy and server proxy which is indepentdent of web server(nginx or apache). That is to say the server proxy will listen to 80 and handle the http connect itself based on Golang lib.
 2. This Golang version using the event-based method resoloves the performance problem of threads on the proxy_dns_fcgi side in C version.
 3. The Golang version client/server is implemented without resource name and with different content tpye. For compatible consideration, Go client can connect to FastCGI－version server with -support_version option. If you connect the go version proxy server, do not use -support_version option.
 4. In FastCGI-verion, the client should be told where to connect for its DNS proxy service with the "-s arg". It will cause a kind of *loop problem* if arg is a url like "http://proxy-dns.vix.su" and GW server happens to  use 127.0.0.1 as one of its /etc/resolv.conf nameservers. The Golang version correct it by using a speciall DNS request for the domain in the url firstly.
@@ -71,3 +71,7 @@ Make sure you have a working "dig" command. If you started your client side dns_
 	dig @127.0.0.1 www.yeti-dns.org aaaa
 
 and get a result back.
+
+To Do List
+-----------
+1. To support https in client and server. Currently, this code is only work on 80 without TLS/https. 
