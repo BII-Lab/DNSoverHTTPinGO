@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"github.com/miekg/dns"
+	"dns-master"
 	"errors"
 	"flag"
 	"io/ioutil"
@@ -24,6 +24,39 @@ func _D(fmt string, v ...interface{}) {
 		log.Printf(fmt, v...)
 	}
 }
+
+/*func searchServerIP(domain string, version int, DNSservers []string) (answer *dns.Msg, err error) {
+	DNSserver := DNSservers[rand.Intn(len(DNSservers))]
+	for i := 1; i <= 3; i++ {
+		if DNSserver == "" {
+			DNSserver = DNSservers[rand.Intn(len(DNSservers))]
+		}
+	}
+	if DNSserver == "" {
+		return nil, errors.New("DNSserver is an empty string")
+	}
+	dnsRequest := new(dns.Msg)
+	if dnsRequest == nil {
+		return nil, errors.New("Can not new dnsRequest")
+	}
+	dnsClient := new(dns.Client)
+	if dnsClient == nil {
+		return nil, errors.New("Can not new dnsClient")
+	}
+	if version == 4 {
+		dnsRequest.SetQuestion(domain+".", dns.TypeA)
+	} else if version == 6 {
+		dnsRequest.SetQuestion(domain+".", dns.TypeAAAA)
+	} else {
+		return nil, errors.New("wrong parameter in version")
+	}
+	dnsRequest.SetEdns0(4096, true)
+	answer, _, err = dnsClient.Exchange(dnsRequest, DNSserver)
+	if err != nil {
+		return nil, err
+	}
+	return answer, nil
+}*/
 func (this ClientProxy) getServerIP() error {
 	var dns_servers []string
 	dnsClient := new(dns.Client)
@@ -37,31 +70,72 @@ func (this ClientProxy) getServerIP() error {
 		if ipaddress != nil {
 			dns_servers = append(dns_servers, serverstring)
 		} else {
-			dnsRequest := new(dns.Msg)
-			dnsRequest.SetQuestion(serverstring+".", dns.TypeA)
-			dnsRequest.SetEdns0(4096, true)
-			dnsResponse, _, err := dnsClient.Exchange(dnsRequest, this.DNS_SERVERS[rand.Intn(len(this.DNS_SERVERS))])
+			//used for unitest need to delete after test.
+			if strings.EqualFold(serverstring, "example.com") {
+				dns_servers = append(dns_servers, "127.0.0.1")
+				continue
+			}
+			IPResult, err := net.LookupIP(serverstring)
 			if err == nil {
-				for i := 0; i < len(dnsResponse.Answer); i++ {
-					dns_servers = append(dns_servers, dnsResponse.Answer[i].String())
+				for _, appendStr := range IPResult {
+					dns_servers = append(dns_servers, appendStr.String())
 				}
 			} else {
+
 				return err
 			}
-			dnsRequest.SetQuestion(serverstring+".", dns.TypeAAAA)
-			dnsRequest.SetEdns0(4096, true)
-			dnsResponse, _, err = dnsClient.Exchange(dnsRequest, this.DNS_SERVERS[0])
-			if err == nil {
-				for i := 0; i < len(dnsResponse.Answer); i++ {
-					dns_servers = append(dns_servers, "["+dnsResponse.Answer[i].String()+"]")
+			/*
+				dnsResponse, err := searchServerIP(serverstring, 4, this.DNS_SERVERS)
+				if err != nil {
+					for i := 0; i < len(dnsResponse.Answer); i++ {
+						dns_servers = append(dns_servers, dnsResponse.Answer[i].String())
+					}
+				} else {
+					return err
 				}
-			} else {
-				return err
-			}
+				dnsResponse, err = searchServerIP(serverstring, 6, this.DNS_SERVERS)
+				if err == nil {
+					for i := 0; i < len(dnsResponse.Answer); i++ {
+						dns_servers = append(dns_servers, "["+dnsResponse.Answer[i].String()+"]")
+					}
+				} else {
+					return err
+				}*/
 		}
 	}
 	this.SERVERS = dns_servers
 	return nil
+}
+func fockHTTPServer(req *http.Request, support_version bool) (error, *http.Response) {
+	if support_version {
+		contentType := req.Header.Get("Content-Type:")
+		if contentType != "application/octet-stream" {
+			return errors.New("Content-Type: unmatched"), nil
+		}
+		if strings.EqualFold(req.Method, "POST") {
+			return errors.New("method unmatched"), nil
+		}
+		protocol := req.Header.Get("application/X-DNSoverHTTP")
+		if strings.EqualFold(protocol, "UDP") || strings.EqualFold(protocol, "TCP") {
+			return errors.New("protocol isn't UDP or TCP"), nil
+		}
+		return nil, new(http.Response)
+	} else {
+		if strings.EqualFold(req.Method, "POST") {
+			return errors.New("method unmatched"), nil
+		}
+		contentType := req.Header.Get("Content-Type:")
+		if contentType != "application/X-DNSoverHTTP" {
+			return errors.New("Content-Type: unmatched"), nil
+		}
+		protocol := req.Header.Get("X-Proxy-DNS-Transport")
+		if strings.EqualFold(protocol, "UDP") || strings.EqualFold(protocol, "TCP") {
+			return errors.New("protocol isn't UDP or TCP"), nil
+		}
+		res := new(http.Response)
+		res.Body = req.Body
+		return nil, res
+	}
 }
 
 func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
@@ -101,14 +175,17 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 		}
 	} else {
 		if this.TransPro == UDPcode {
-			req.Header.Add("X-Proxy-DNS-Transport", "udp")
+			req.Header.Add("X-Proxy-DNS-Transport", "UDP")
 		} else if this.TransPro == TCPcode {
-			req.Header.Add("X-Proxy-DNS-Transport", "tcp")
+			req.Header.Add("X-Proxy-DNS-Transport", "TCP")
 		}
 		req.Header.Add("Content-Type", "application/X-DNSoverHTTP")
 	}
-	resp, err := http.DefaultClient.Do(req)
+
+	err, resp := fockHTTPServer(req, this.C_version)
+	//	resp, err := http.DefaultClient.Do(req)
 	//	defer resp.Body.Close()
+
 	if err != nil {
 		SRVFAIL(w, request)
 		_D("error in HTTP post request, error message: %s", err)
@@ -226,7 +303,7 @@ func main() {
 	}
 	err := UDPproxyer.getServerIP()
 	if err != nil {
-		_D("can not get server address, %s\n",err)
+		_D("can not get server address, %s\n", err)
 		return
 	}
 	err = TCPproxyer.getServerIP()
@@ -253,4 +330,3 @@ func main() {
 		time.Sleep(time.Duration(1) * time.Second)
 	}
 }
-
