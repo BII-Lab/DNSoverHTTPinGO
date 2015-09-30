@@ -52,7 +52,16 @@ func DoDNSquery(m dns.Msg, TransProString string, server []string, timeout time.
 		return nil, errors.New("TransProString run")
 	}
 	dnsClient.Net = strings.ToLower(TransProString)
-	dnsResponse, _, err := dnsClient.Exchange(&m, server[rand.Intn(len(server))])
+	ServerStr := server[rand.Intn(len(server))]
+	ServerAddr := net.ParseIP(ServerStr)
+	if ServerAddr.To16() != nil {
+		ServerStr = "[" + ServerStr + "]:53"
+	} else if ServerAddr.To4() != nil {
+		ServerStr = ServerStr + ":53"
+	} else {
+		return nil, errors.New("invalid Server Address")
+	}
+	dnsResponse, _, err := dnsClient.Exchange(&m, ServerStr)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +70,7 @@ func DoDNSquery(m dns.Msg, TransProString string, server []string, timeout time.
 
 //not sure how to make a server fail, error 501?
 func (this Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	TransProString := r.Header.Get("X-Proxy-DNS-Transport")
+	TransProString := r.Header.Get("Proxy-DNS-Transport")
 	if TransProString == "TCP" {
 		this.TransPro = TCPcode
 	} else if TransProString == "UDP" {
@@ -72,7 +81,7 @@ func (this Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	contentTypeStr := r.Header.Get("Content-Type")
-	if contentTypeStr != "application/X-DNSoverHTTP" {
+	if contentTypeStr != "application/octet-stream" {
 		_D("Content-Type illegal")
 		http.Error(w, "Server Error: unknown content type", 415)
 		return
@@ -124,7 +133,7 @@ func (this Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dnsResponse, err := DoDNSquery(dnsRequest, TransProString, this.SERVERS, this.timeout)
 	if err != nil {
 		_D("error in communicate with resolver, error message: %s", err)
-		http.Error(w, "Server Error", 500)
+		http.Error(w, err.Error(), 500)
 		return
 	}
 	if dnsResponse == nil {
@@ -153,7 +162,7 @@ func main() {
 		max_entries int64
 		ACCESS      string
 	)
-	flag.StringVar(&S_SERVERS, "proxy", "127.0.0.1:53", "we proxy requests to those servers") //Not sure use IP or URL, default server undefined
+	flag.StringVar(&S_SERVERS, "proxy", "127.0.0.1", "we proxy requests to those servers") //Not sure use IP or URL, default server undefined
 	flag.IntVar(&timeout, "timeout", 5, "timeout")
 	flag.BoolVar(&DEBUG, "debug", false, "enable/disable debug")
 	flag.Int64Var(&max_entries, "max_cache_entries", 2000000, "max cache entries")

@@ -25,7 +25,7 @@ func _D(fmt string, v ...interface{}) {
 	}
 }
 
-/*func searchServerIP(domain string, version int, DNSservers []string) (answer *dns.Msg, err error) {
+func searchServerIP(domain string, version int, DNSservers []string) (answer *dns.Msg, err error) {
 	DNSserver := DNSservers[rand.Intn(len(DNSservers))]
 	for i := 1; i <= 3; i++ {
 		if DNSserver == "" {
@@ -56,7 +56,7 @@ func _D(fmt string, v ...interface{}) {
 		return nil, err
 	}
 	return answer, nil
-}*/
+}
 func (this ClientProxy) getServerIP() error {
 	var dns_servers []string
 	dnsClient := new(dns.Client)
@@ -71,7 +71,7 @@ func (this ClientProxy) getServerIP() error {
 			dns_servers = append(dns_servers, serverstring)
 		} else {
 			//used for unitest need to delete after test.
-			if strings.EqualFold(serverstring, "example.com") {
+			/*if strings.EqualFold(serverstring, "example.com") {
 				dns_servers = append(dns_servers, "127.0.0.1")
 				continue
 			}
@@ -83,24 +83,23 @@ func (this ClientProxy) getServerIP() error {
 			} else {
 
 				return err
-			}
-			/*
-				dnsResponse, err := searchServerIP(serverstring, 4, this.DNS_SERVERS)
-				if err != nil {
-					for i := 0; i < len(dnsResponse.Answer); i++ {
-						dns_servers = append(dns_servers, dnsResponse.Answer[i].String())
-					}
-				} else {
-					return err
+			}*/
+			dnsResponse, err := searchServerIP(serverstring, 4, this.DNS_SERVERS)
+			if err != nil {
+				for i := 0; i < len(dnsResponse.Answer); i++ {
+					dns_servers = append(dns_servers, dnsResponse.Answer[i].String())
 				}
-				dnsResponse, err = searchServerIP(serverstring, 6, this.DNS_SERVERS)
-				if err == nil {
-					for i := 0; i < len(dnsResponse.Answer); i++ {
-						dns_servers = append(dns_servers, "["+dnsResponse.Answer[i].String()+"]")
-					}
-				} else {
-					return err
-				}*/
+			} else {
+				return err
+			}
+			dnsResponse, err = searchServerIP(serverstring, 6, this.DNS_SERVERS)
+			if err == nil {
+				for i := 0; i < len(dnsResponse.Answer); i++ {
+					dns_servers = append(dns_servers, "["+dnsResponse.Answer[i].String()+"]")
+				}
+			} else {
+				return err
+			}
 		}
 	}
 	this.SERVERS = dns_servers
@@ -155,36 +154,45 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	}
 
 	postBytesReader := bytes.NewReader(request_bytes)
-	if this.C_version {
-		ServerInputurl = ServerInputurl + "/proxy_dns"
-	}
+
+	ServerInputurl = ServerInputurl + "/proxy_dns"
+
 	req, err := http.NewRequest("POST", ServerInputurl, postBytesReader) //need add random here in future
 	if err != nil {
 		SRVFAIL(w, request)
 		_D("error in creating HTTP request, error message: %s", err)
 		return
 	}
-	if this.C_version {
-		req.Header.Add("Host", ServerInput)
-		req.Header.Add("Accept: ", "application/octet-stream")
-		req.Header.Add("Content-Type: ", "application/octet-stream")
-		if this.TransPro == UDPcode {
-			req.Header.Add("Proxy-DNS-Transport", "UDP")
-		} else if this.TransPro == TCPcode {
-			req.Header.Add("Proxy-DNS-Transport", "TCP")
-		}
-	} else {
-		if this.TransPro == UDPcode {
-			req.Header.Add("X-Proxy-DNS-Transport", "UDP")
-		} else if this.TransPro == TCPcode {
-			req.Header.Add("X-Proxy-DNS-Transport", "TCP")
-		}
-		req.Header.Add("Content-Type", "application/X-DNSoverHTTP")
+	req.Header.Add("Host", ServerInput)
+	req.Header.Add("Accept", "application/octet-stream")
+	req.Header.Add("Content-Type", "application/octet-stream")
+	if this.TransPro == UDPcode {
+		req.Header.Add("Proxy-DNS-Transport", "UDP")
+	} else if this.TransPro == TCPcode {
+		req.Header.Add("Proxy-DNS-Transport", "TCP")
 	}
-
-	err, resp := fockHTTPServer(req, this.C_version)
-	//	resp, err := http.DefaultClient.Do(req)
-	//	defer resp.Body.Close()
+	/*
+		if this.C_version {
+			req.Header.Add("Host", ServerInput)
+			req.Header.Add("Accept: ", "application/octet-stream")
+			req.Header.Add("Content-Type: ", "application/octet-stream")
+			if this.TransPro == UDPcode {
+				req.Header.Add("Proxy-DNS-Transport", "UDP")
+			} else if this.TransPro == TCPcode {
+				req.Header.Add("Proxy-DNS-Transport", "TCP")
+			}
+		} else {
+			if this.TransPro == UDPcode {
+				req.Header.Add("X-Proxy-DNS-Transport", "UDP")
+			} else if this.TransPro == TCPcode {
+				req.Header.Add("X-Proxy-DNS-Transport", "TCP")
+			}
+			req.Header.Add("Content-Type", "application/X-DNSoverHTTP")
+		}
+	*/
+	//err, resp := fockHTTPServer(req, this.C_version)
+	resp, err := http.DefaultClient.Do(req)
+	//defer resp.Body.Close()
 
 	if err != nil {
 		SRVFAIL(w, request)

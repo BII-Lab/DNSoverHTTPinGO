@@ -8,7 +8,6 @@ import "net"
 import "dns-master"
 import "strings"
 
-/*
 func TestSearchIP(t *testing.T) {
 	domainTestArray := [4]string{"", "google.com", "tisf.net", "baiduo.abc"}
 	versionTestArray := [7]int{-1, 0, 3, 4, 5, 6, 7}
@@ -66,7 +65,7 @@ func TestSearchIP(t *testing.T) {
 	}
 	t.Log("SearchIP ended")
 }
-*/
+
 func TestGetServerIP(t *testing.T) {
 	t.Log("start testing getServerIP")
 	var testServer1 []string = make([]string, 1, 1)

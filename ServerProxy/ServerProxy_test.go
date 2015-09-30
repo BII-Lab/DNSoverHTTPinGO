@@ -11,7 +11,7 @@ import "dns-master"
 func TestDoDNSquery(t *testing.T) {
 	domainTestArray := [4]string{"", "google.com", "tisf.net", "baiduo.abc"}
 	transportStrArray := []string{"UDP", "TCP", "XXX"}
-	testinput := [1]string{"8.8.8.8:53"}
+	testinput := [2]string{"114.114.114.114", "240c::6666"}
 	var inputslice []string = testinput[:]
 	var testMsg dns.Msg
 	testMsg.SetQuestion(domainTestArray[1]+".", dns.TypeA)
