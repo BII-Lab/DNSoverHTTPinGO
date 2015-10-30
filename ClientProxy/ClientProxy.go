@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"dns-master"
+	"github.com/miekg/dns"
 	"errors"
 	"flag"
 	"io/ioutil"
@@ -141,7 +141,8 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	request_bytes, err := request.Pack() //I am not sure it is better to pack directly or using a pointer
 	if err != nil {
 		SRVFAIL(w, request)
-		_D("error in packing request, error message: %s", err)
+		_D("error in packing request from %s for '%s', error message: %s",
+		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 	ServerInput := this.SERVERS[rand.Intn(len(this.SERVERS))]
@@ -160,7 +161,8 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	req, err := http.NewRequest("POST", ServerInputurl, postBytesReader) //need add random here in future
 	if err != nil {
 		SRVFAIL(w, request)
-		_D("error in creating HTTP request, error message: %s", err)
+		_D("error in creating HTTP request from %s for '%s', error message: %s",
+		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 	req.Header.Add("Host", ServerInput)
@@ -196,7 +198,8 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 
 	if err != nil {
 		SRVFAIL(w, request)
-		_D("error in HTTP post request, error message: %s", err)
+		_D("error in HTTP post request for query from %s for '%s', error message: %s",
+		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 	var requestBody []byte
@@ -206,26 +209,31 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 		// these need to be separate checks, otherwise you will get a nil-reference
 		// when you print the error message below!
 		SRVFAIL(w, request)
-		_D("error in reading HTTP response, error message: %s", err)
+		_D("error in reading HTTP response for query from %s for '%s', error message: %s",
+		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 	//I not sure whether I should return server fail directly
 	//I just found there is a bug here. Body.Read can not read all the contents out, I don't know how to solve it.
 	if len(requestBody) < (int)(resp.ContentLength) {
 		SRVFAIL(w, request)
-		_D("fail to read all HTTP content")
+		_D("failure reading all HTTP content for query from %s for '%s' (%d of %d bytes read)",
+		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name,
+		   len(requestBody), (int)(resp.ContentLength))
 		return
 	}
 	var DNSreponse dns.Msg
 	err = DNSreponse.Unpack(requestBody)
 	if err != nil {
 		SRVFAIL(w, request)
-		_D("error in packing HTTP response to DNS, error message: %s", err)
+		_D("error in packing HTTP response for query from %s for '%s', error message: %s",
+		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 	err = w.WriteMsg(&DNSreponse)
 	if err != nil {
-		_D("error in sending DNS response back, error message: %s", err)
+		_D("error in sending DNS response back for query from %s for '%s', error message: %s",
+		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 }
