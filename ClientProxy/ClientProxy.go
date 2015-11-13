@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"github.com/miekg/dns"
+	"dns-master"
 	"errors"
 	"flag"
 	"io/ioutil"
@@ -142,7 +142,7 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	if err != nil {
 		SRVFAIL(w, request)
 		_D("error in packing request from %s for '%s', error message: %s",
-		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
+			dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 	ServerInput := this.SERVERS[rand.Intn(len(this.SERVERS))]
@@ -162,7 +162,7 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	if err != nil {
 		SRVFAIL(w, request)
 		_D("error in creating HTTP request from %s for '%s', error message: %s",
-		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
+			dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 	req.Header.Add("Host", ServerInput)
@@ -199,8 +199,12 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	if err != nil {
 		SRVFAIL(w, request)
 		_D("error in HTTP post request for query from %s for '%s', error message: %s",
-		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
+			dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
+	}
+	if resp.StatusCode >= 500 {
+		SRVFAIL(w, request)
+		_D("HTTP ERROR: %s", http.StatusText(resp.StatusCode))
 	}
 	var requestBody []byte
 	requestBody, err = ioutil.ReadAll(resp.Body)
@@ -210,7 +214,7 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 		// when you print the error message below!
 		SRVFAIL(w, request)
 		_D("error in reading HTTP response for query from %s for '%s', error message: %s",
-		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
+			dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 	//I not sure whether I should return server fail directly
@@ -218,8 +222,8 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	if len(requestBody) < (int)(resp.ContentLength) {
 		SRVFAIL(w, request)
 		_D("failure reading all HTTP content for query from %s for '%s' (%d of %d bytes read)",
-		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name,
-		   len(requestBody), (int)(resp.ContentLength))
+			dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name,
+			len(requestBody), (int)(resp.ContentLength))
 		return
 	}
 	var DNSreponse dns.Msg
@@ -227,13 +231,13 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	if err != nil {
 		SRVFAIL(w, request)
 		_D("error in packing HTTP response for query from %s for '%s', error message: %s",
-		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
+			dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 	err = w.WriteMsg(&DNSreponse)
 	if err != nil {
 		_D("error in sending DNS response back for query from %s for '%s', error message: %s",
-		   dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
+			dns.ResponseWriter.RemoteAddr(w), request.Question[0].Name, err)
 		return
 	}
 }
@@ -272,7 +276,7 @@ func main() {
 		S_DNS_SERVERS   string
 		Support_C       bool
 	)
-	flag.StringVar(&S_SERVERS, "proxy", "", "we proxy requests to those servers,input like fci.biilab.cn") //Not sure use IP or URL, default server undefined
+	flag.StringVar(&S_SERVERS, "proxy", "24.104.150.237", "we proxy requests to those servers,input like fci.biilab.cn") //Not sure use IP or URL, default server undefined
 	flag.StringVar(&S_LISTEN, "listen", "[::]:53", "listen on (both tcp and udp)")
 	flag.StringVar(&S_ACCESS, "access", "127.0.0.0/8,10.0.0.0/8", "allow those networks, use 0.0.0.0/0 to allow everything")
 	flag.IntVar(&timeout, "timeout", 5, "timeout")

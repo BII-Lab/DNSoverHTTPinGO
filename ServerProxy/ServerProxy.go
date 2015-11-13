@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	//	"bytes"
-	"dns-master"
+	"github.com/miekg/dns"
 	"flag"
 	"io/ioutil"
 	"log"
