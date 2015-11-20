@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	//	"bytes"
-	"github.com/miekg/dns"
 	"flag"
+	"github.com/miekg/dns"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -161,12 +161,17 @@ func main() {
 		timeout     int
 		max_entries int64
 		ACCESS      string
+		ServeTLS    bool
+	//	tls_cert_path	string
+	//	tls_key_path	string
 	)
 	flag.StringVar(&S_SERVERS, "proxy", "127.0.0.1", "we proxy requests to those servers") //Not sure use IP or URL, default server undefined
 	flag.IntVar(&timeout, "timeout", 5, "timeout")
 	flag.BoolVar(&DEBUG, "debug", false, "enable/disable debug")
 	flag.Int64Var(&max_entries, "max_cache_entries", 2000000, "max cache entries")
 	flag.StringVar(&ACCESS, "access", "0.0.0.0/0", "allow those networks, use 0.0.0.0/0 to allow everything")
+	flag.BoolVar(&ServeTLS, "ServeTls", false, "whether serve TLS")
+	//flag.StringVar(&tls_cert_path, "cetificate path",)
 	flag.Parse()
 	servers := strings.Split(S_SERVERS, ",")
 	proxyServer := Server{
@@ -186,6 +191,12 @@ func main() {
 	err := http.ListenAndServe(":80", proxyServer)
 	if err != nil {
 		log.Fatal("ListenAndServe:", err)
+	}
+	if ServeTLS {
+		err := http.ListenAndServeTLS(":443", "cert.pem", "key.pem", proxyServer)
+		if err != nil {
+			log.Fatal("ListenAndServe:", err)
+		}
 	}
 	for {
 		proxyServer.NOW = time.Now().UTC().Unix()
