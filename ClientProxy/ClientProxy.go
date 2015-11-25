@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	//	"crypto/x509"
+	"crypto/x509"
 	"errors"
 	"flag"
 	"github.com/miekg/dns"
@@ -139,6 +139,32 @@ func fockHTTPServer(req *http.Request, support_version bool) (error, *http.Respo
 	}
 }
 
+/*
+func (this ClientProxy) CreateHTTPClient() {
+	if this.start_TLS == false {
+		this.client = &http.Client{}
+	} else {
+		if this.TLS_Path == "" {
+			tr := &http.Transport{
+				TLSClientConfig:    &tls.Config{InsecureSkipVerify: true},
+				DisableCompression: true}
+			this.client = &http.Client{Transport: tr}
+		} else {
+			pool := x509.NewCertPool()
+			caCrt, err := ioutil.ReadFile(this.TLS_Path)
+			if err != nil {
+				_D("invalid cetificate path: %s", this.TLS_Path)
+				return
+			}
+			pool.AppendCertsFromPEM(caCrt)
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{RootCAs: pool},
+			}
+			this.client = &http.Client{Transport: tr}
+		}
+	}
+}
+*/
 func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	request_bytes, err := request.Pack() //I am not sure it is better to pack directly or using a pointer
 	if err != nil {
@@ -184,13 +210,32 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	} else if this.TransPro == TCPcode {
 		req.Header.Add("Proxy-DNS-Transport", "TCP")
 	}
-
-	tr := &http.Transport{
-		TLSClientConfig:    &tls.Config{InsecureSkipVerify: true},
-		DisableCompression: true,
+	if this.start_TLS == false {
+		//HTTP version
+		this.client = &http.Client{}
+	} else {
+		//HTTPS version disabled certificate verification
+		if this.TLS_Path == "" {
+			tr := &http.Transport{
+				TLSClientConfig:    &tls.Config{InsecureSkipVerify: true},
+				DisableCompression: true}
+			this.client = &http.Client{Transport: tr}
+		} else {
+			//HTTPS version allow the certificate manually
+			pool := x509.NewCertPool()
+			caCrt, err := ioutil.ReadFile(this.TLS_Path)
+			if err != nil {
+				_D("invalid cetificate path: %s", this.TLS_Path)
+				return
+			}
+			pool.AppendCertsFromPEM(caCrt)
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{RootCAs: pool},
+			}
+			this.client = &http.Client{Transport: tr}
+		}
 	}
-	client := &http.Client{Transport: tr}
-	resp, err := client.Do(req)
+	resp, err := this.client.Do(req)
 	if err != nil {
 		SRVFAIL(w, request)
 		_D("error in HTTP post request for query from %s for '%s', error message: %s",
@@ -255,6 +300,8 @@ type ClientProxy struct {
 	TransPro    int //specify for transmit protocol
 	DNS_SERVERS []string
 	start_TLS   bool
+	TLS_Path    string
+	client      *http.Client
 }
 
 const UDPcode = 1
@@ -270,6 +317,7 @@ func main() {
 		expire_interval int64
 		S_DNS_SERVERS   string
 		start_TLS       bool
+		TLS_Path        string
 	)
 	flag.StringVar(&S_SERVERS, "proxy", "24.104.150.237", "we proxy requests to those servers,input like fci.biilab.cn") //Not sure use IP or URL, default server undefined
 	flag.StringVar(&S_LISTEN, "listen", "[::]:53", "listen on (both tcp and udp)")
@@ -280,6 +328,7 @@ func main() {
 	flag.Int64Var(&max_entries, "max_cache_entries", 2000000, "max cache entries")
 	flag.StringVar(&S_DNS_SERVERS, "dns_server", "114.114.114.114:53", "DNS server for initial server lookup")
 	flag.BoolVar(&start_TLS, "start_TLS", false, "Whether use HTTPS to increase privacy.")
+	flag.StringVar(&TLS_Path, "certificate_path", "", "The path of certificate, use no input to let client not validate certificate")
 	flag.Parse()
 	servers := strings.Split(S_SERVERS, ",")
 	dns_servers := strings.Split(S_DNS_SERVERS, ",")
@@ -294,7 +343,8 @@ func main() {
 		max_entries: max_entries,
 		TransPro:    UDPcode,
 		DNS_SERVERS: dns_servers,
-		start_TLS:   start_TLS}
+		start_TLS:   start_TLS,
+		TLS_Path:    TLS_Path}
 	TCPproxyer := ClientProxy{
 		giant:       new(sync.RWMutex),
 		ACCESS:      make([]*net.IPNet, 0),
@@ -306,7 +356,8 @@ func main() {
 		max_entries: max_entries,
 		TransPro:    TCPcode,
 		DNS_SERVERS: dns_servers,
-		start_TLS:   start_TLS}
+		start_TLS:   start_TLS,
+		TLS_Path:    TLS_Path}
 	for _, mask := range strings.Split(S_ACCESS, ",") {
 		_, cidr, err := net.ParseCIDR(mask)
 		if err != nil {
