@@ -68,8 +68,17 @@ func DoDNSquery(m dns.Msg, TransProString string, server []string, timeout time.
 	return dnsResponse, nil
 }
 
-//not sure how to make a server fail, error 501?
+// Process HTTP requests.
+// "dns-wireformat" requests get proxied, others get read out of our answer
+// directory.
 func (this Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/.well-known/dns-wireformat" {
+		this.tryDNSoverHTTP(w, r)
+        }
+}
+
+//not sure how to make a server fail, error 501?
+func (this Server) tryDNSoverHTTP(w http.ResponseWriter, r *http.Request) {
 	TransProString := r.Header.Get("Proxy-DNS-Transport")
 	if TransProString == "TCP" {
 		this.TransPro = TCPcode
