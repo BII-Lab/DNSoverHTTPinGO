@@ -4,6 +4,7 @@ import (
 	"errors"
 	//	"bytes"
 	"flag"
+	"fmt"
 	"github.com/miekg/dns"
 	"io/ioutil"
 	"log"
@@ -49,7 +50,7 @@ func DoDNSquery(m dns.Msg, TransProString string, server []string, timeout time.
 	dnsClient.ReadTimeout = timeout
 	dnsClient.WriteTimeout = timeout
 	if TransProString != "TCP" && TransProString != "UDP" {
-		return nil, errors.New("TransProString run")
+		return nil, errors.New(fmt.Sprintf("Transport not TCP or UDP: %s", TransProString))
 	}
 	dnsClient.Net = strings.ToLower(TransProString)
 	ServerStr := server[rand.Intn(len(server))]
@@ -59,7 +60,7 @@ func DoDNSquery(m dns.Msg, TransProString string, server []string, timeout time.
 	} else if ServerAddr.To4() != nil {
 		ServerStr = ServerStr + ":53"
 	} else {
-		return nil, errors.New("invalid Server Address")
+		return nil, errors.New(fmt.Sprintf("Invalid server address: %s", ServerStr))
 	}
 	dnsResponse, _, err := dnsClient.Exchange(&m, ServerStr)
 	if err != nil {
@@ -77,7 +78,6 @@ func (this Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
         }
 }
 
-//not sure how to make a server fail, error 501?
 func (this Server) tryDNSoverHTTP(w http.ResponseWriter, r *http.Request) {
 	TransProString := r.Header.Get("Proxy-DNS-Transport")
 	if TransProString == "TCP" {
@@ -85,83 +85,67 @@ func (this Server) tryDNSoverHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if TransProString == "UDP" {
 		this.TransPro = UDPcode
 	} else {
-		_D("Transport protol not udp or tcp")
-		http.Error(w, "Server Error: unknown transport protocol", 415)
+		msg := fmt.Sprintf("Transport protocol not UDP or TCP: %s", this.TransPro)
+		_D("%s", msg)
+		http.Error(w, msg, 415)
 		return
 	}
 	contentTypeStr := r.Header.Get("Content-Type")
 	if contentTypeStr != "application/octet-stream" {
-		_D("Content-Type illegal")
-		http.Error(w, "Server Error: unknown content type", 415)
+		msg := fmt.Sprintf("Unsupported content-type: %s", contentTypeStr)
+		_D("%s", msg)
+		http.Error(w, msg, 415)
 		return
 	}
 	var requestBody []byte
 	requestBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Server Error: error in reading request", 400)
-		_D("error in reading HTTP request, error message: %s", err)
+		msg := fmt.Sprintf("Error reading HTTP request: %s", err)
+		_D("%s", msg)
+		http.Error(w, msg, 400)
 		return
 	}
 	if len(requestBody) < (int)(r.ContentLength) {
-		http.Error(w, "Server Error: error in reading request", 400)
-		_D("fail to read all HTTP content")
+		msg := fmt.Sprintf("Error reading HTTP request: expected %d bytes but only read %d",
+			(int)(r.ContentLength), len(requestBody))
+		_D("%s", msg)
+		http.Error(w, msg, 400)
 		return
 	}
 	var dnsRequest dns.Msg
 	err = dnsRequest.Unpack(requestBody)
 	if err != nil {
-		http.Error(w, "Server Error: bad DNS request", 400)
-		_D("error in packing HTTP response to DNS, error message: %s", err)
+		msg := fmt.Sprintf("Error unpacking DNS message: %s", err)
+		_D("%s", msg)
+		http.Error(w, msg, 400)
 		return
 	}
-	/*
-		dnsClient := new(dns.Client)
-		if dnsClient == nil {
-			http.Error(w, "Server Error", 500)
-			_D("cannot create DNS client")
-			return
-		}
-		dnsClient.ReadTimeout = this.timeout
-		dnsClient.WriteTimeout = this.timeout
-		dnsClient.Net = TransProString
-		//will use a parameter to let user address resolver in future
-		dnsResponse, RTT, err := dnsClient.Exchange(&dnsRequest, this.SERVERS[rand.Intn(len(this.SERVERS))])
-		//dnsResponse, RTT, err := dnsClient.Exchange(&dnsRequest, this.SERVERS[0])
-		if err != nil {
-			_D("error in communicate with resolver, error message: %s", err)
-			http.Error(w, "Server Error", 500)
-			return
-		} else {
-			_D("request took %s", RTT)
-		}
-		if dnsResponse == nil {
-			_D("no response back")
-			http.Error(w, "Server Error:No Recursive response", 500)
-			return
-		}*/
 	dnsResponse, err := DoDNSquery(dnsRequest, TransProString, this.SERVERS, this.timeout)
 	if err != nil {
-		_D("error in communicate with resolver, error message: %s", err)
-		http.Error(w, err.Error(), 500)
+		msg := fmt.Sprintf("Error querying DNS resolver: %s", err)
+		_D("%s", msg)
+		http.Error(w, msg, 500)
 		return
 	}
 	if dnsResponse == nil {
-		_D("no response back")
-		http.Error(w, "Server Error:No Recursive response", 500)
+		msg := "Error querying DNS resolver: no response"
+		_D("%s", msg)
+		http.Error(w, msg, 500)
 		return
 	}
 	response_bytes, err := dnsResponse.Pack()
 	if err != nil {
-		http.Error(w, "Server Error: error packing reply", 500)
-		_D("error in packing request, error message: %s", err)
+		msg := fmt.Sprintf("Error converting DNS message to bytes: %s", err)
+		_D("%s", msg)
+		http.Error(w, msg, 500)
 		return
 	}
 	_, err = w.Write(response_bytes)
 	if err != nil {
-		_D("Can not write response rightly, error message: %s", err)
+		msg := fmt.Sprintf("Error writing HTTP response: %s", err)
+		_D("%s", msg)
 		return
 	}
-	//don't know how to creat a response here
 }
 
 func main() {
