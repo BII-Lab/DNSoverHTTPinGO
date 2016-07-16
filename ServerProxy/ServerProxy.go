@@ -2,15 +2,17 @@ package main
 
 import (
 	"errors"
-	//	"bytes"
 	"flag"
 	"fmt"
 	"github.com/miekg/dns"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -75,7 +77,40 @@ func DoDNSquery(m dns.Msg, TransProString string, server []string, timeout time.
 func (this Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/.well-known/dns-wireformat" {
 		this.tryDNSoverHTTP(w, r)
-        }
+        } else {
+		this.tryStaticHTTP(w, r)
+	}
+}
+
+// XXX: the directory to read HTML from should be a command-line argument, not "html/"
+func (this Server) tryStaticHTTP(w http.ResponseWriter, r *http.Request) {
+	var path string
+	if r.URL.Path == "/" {
+		path = "html/index.html"
+	} else {
+		path = filepath.Clean("html/" + r.URL.Path)
+	}
+	if !strings.HasPrefix(path, "html/") {
+		msg := fmt.Sprintf("Invalid URL: %s", r.URL.Path)
+		http.Error(w, msg, 403)
+		return
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		errcode := 400
+		if err == os.ErrPermission {
+			errcode = 401
+		} else if err == os.ErrNotExist {
+			errcode = 404
+		}
+		msg := fmt.Sprintf("Error retrieving '%s': %s", r.URL.Path, err)
+		http.Error(w, msg, errcode)
+		return
+	}
+	defer file.Close()
+
+	_, err = io.Copy(w, file)
+	// not sure what to do with the error here
 }
 
 func (this Server) tryDNSoverHTTP(w http.ResponseWriter, r *http.Request) {
