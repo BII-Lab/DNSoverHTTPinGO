@@ -120,7 +120,7 @@ func (this Server) tryDNSoverHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if TransProString == "UDP" {
 		this.TransPro = UDPcode
 	} else {
-		msg := fmt.Sprintf("Transport protocol not UDP or TCP: %s", this.TransPro)
+		msg := fmt.Sprintf("Transport protocol not UDP or TCP: %s", TransProString)
 		_D("%s", msg)
 		http.Error(w, msg, 415)
 		return
