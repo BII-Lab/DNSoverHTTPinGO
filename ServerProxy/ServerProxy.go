@@ -115,6 +115,15 @@ func (this Server) tryStaticHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (this Server) tryDNSoverHTTP(w http.ResponseWriter, r *http.Request) {
 	TransProString := r.Header.Get("Proxy-DNS-Transport")
+	if TransProString == "" {
+		TransProString = r.Header.Get("X-Proxy-DNS-Transport")
+	}
+	if TransProString == "" {
+		msg := fmt.Sprintf("No transport protocol specified")
+		_D("%s", msg)
+		http.Error(w, msg, 415)
+		return
+	}
 	if TransProString == "TCP" {
 		this.TransPro = TCPcode
 	} else if TransProString == "UDP" {
@@ -127,7 +136,7 @@ func (this Server) tryDNSoverHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	contentTypeStr := r.Header.Get("Content-Type")
 	if contentTypeStr != "application/octet-stream" {
-		msg := fmt.Sprintf("Unsupported content-type: %s", contentTypeStr)
+		msg := fmt.Sprintf("Unsupported content-type: '%s'", contentTypeStr)
 		_D("%s", msg)
 		http.Error(w, msg, 415)
 		return
