@@ -2,14 +2,17 @@ package main
 
 import (
 	"errors"
-	//	"bytes"
 	"flag"
+	"fmt"
 	"github.com/miekg/dns"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -49,7 +52,7 @@ func DoDNSquery(m dns.Msg, TransProString string, server []string, timeout time.
 	dnsClient.ReadTimeout = timeout
 	dnsClient.WriteTimeout = timeout
 	if TransProString != "TCP" && TransProString != "UDP" {
-		return nil, errors.New("TransProString run")
+		return nil, errors.New(fmt.Sprintf("Transport not TCP or UDP: %s", TransProString))
 	}
 	dnsClient.Net = strings.ToLower(TransProString)
 	ServerStr := server[rand.Intn(len(server))]
@@ -59,7 +62,7 @@ func DoDNSquery(m dns.Msg, TransProString string, server []string, timeout time.
 	} else if ServerAddr.To4() != nil {
 		ServerStr = ServerStr + ":53"
 	} else {
-		return nil, errors.New("invalid Server Address")
+		return nil, errors.New(fmt.Sprintf("Invalid server address: %s", ServerStr))
 	}
 	dnsResponse, _, err := dnsClient.Exchange(&m, ServerStr)
 	if err != nil {
@@ -68,91 +71,125 @@ func DoDNSquery(m dns.Msg, TransProString string, server []string, timeout time.
 	return dnsResponse, nil
 }
 
-//not sure how to make a server fail, error 501?
+// Process HTTP requests.
+// "dns-wireformat" requests get proxied, others get read out of our answer
+// directory.
 func (this Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/.well-known/dns-wireformat" {
+		this.tryDNSoverHTTP(w, r)
+        } else {
+		this.tryStaticHTTP(w, r)
+	}
+}
+
+// XXX: the directory to read HTML from should be a command-line argument, not "html/"
+func (this Server) tryStaticHTTP(w http.ResponseWriter, r *http.Request) {
+	var path string
+	if r.URL.Path == "/" {
+		path = "html/index.html"
+	} else {
+		path = filepath.Clean("html/" + r.URL.Path)
+	}
+	if !strings.HasPrefix(path, "html/") {
+		msg := fmt.Sprintf("Invalid URL: %s", r.URL.Path)
+		http.Error(w, msg, 403)
+		return
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		errcode := 400
+		if err == os.ErrPermission {
+			errcode = 401
+		} else if err == os.ErrNotExist {
+			errcode = 404
+		}
+		msg := fmt.Sprintf("Error retrieving '%s': %s", r.URL.Path, err)
+		http.Error(w, msg, errcode)
+		return
+	}
+	defer file.Close()
+
+	_, err = io.Copy(w, file)
+	// not sure what to do with the error here
+}
+
+func (this Server) tryDNSoverHTTP(w http.ResponseWriter, r *http.Request) {
 	TransProString := r.Header.Get("Proxy-DNS-Transport")
+	if TransProString == "" {
+		TransProString = r.Header.Get("X-Proxy-DNS-Transport")
+	}
+	if TransProString == "" {
+		msg := fmt.Sprintf("No transport protocol specified")
+		_D("%s", msg)
+		http.Error(w, msg, 415)
+		return
+	}
 	if TransProString == "TCP" {
 		this.TransPro = TCPcode
 	} else if TransProString == "UDP" {
 		this.TransPro = UDPcode
 	} else {
-		_D("Transport protol not udp or tcp")
-		http.Error(w, "Server Error: unknown transport protocol", 415)
+		msg := fmt.Sprintf("Transport protocol not UDP or TCP: %s", TransProString)
+		_D("%s", msg)
+		http.Error(w, msg, 415)
 		return
 	}
 	contentTypeStr := r.Header.Get("Content-Type")
 	if contentTypeStr != "application/octet-stream" {
-		_D("Content-Type illegal")
-		http.Error(w, "Server Error: unknown content type", 415)
+		msg := fmt.Sprintf("Unsupported content-type: '%s'", contentTypeStr)
+		_D("%s", msg)
+		http.Error(w, msg, 415)
 		return
 	}
 	var requestBody []byte
 	requestBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Server Error: error in reading request", 400)
-		_D("error in reading HTTP request, error message: %s", err)
+		msg := fmt.Sprintf("Error reading HTTP request: %s", err)
+		_D("%s", msg)
+		http.Error(w, msg, 400)
 		return
 	}
 	if len(requestBody) < (int)(r.ContentLength) {
-		http.Error(w, "Server Error: error in reading request", 400)
-		_D("fail to read all HTTP content")
+		msg := fmt.Sprintf("Error reading HTTP request: expected %d bytes but only read %d",
+			(int)(r.ContentLength), len(requestBody))
+		_D("%s", msg)
+		http.Error(w, msg, 400)
 		return
 	}
 	var dnsRequest dns.Msg
 	err = dnsRequest.Unpack(requestBody)
 	if err != nil {
-		http.Error(w, "Server Error: bad DNS request", 400)
-		_D("error in packing HTTP response to DNS, error message: %s", err)
+		msg := fmt.Sprintf("Error unpacking DNS message: %s", err)
+		_D("%s", msg)
+		http.Error(w, msg, 400)
 		return
 	}
-	/*
-		dnsClient := new(dns.Client)
-		if dnsClient == nil {
-			http.Error(w, "Server Error", 500)
-			_D("cannot create DNS client")
-			return
-		}
-		dnsClient.ReadTimeout = this.timeout
-		dnsClient.WriteTimeout = this.timeout
-		dnsClient.Net = TransProString
-		//will use a parameter to let user address resolver in future
-		dnsResponse, RTT, err := dnsClient.Exchange(&dnsRequest, this.SERVERS[rand.Intn(len(this.SERVERS))])
-		//dnsResponse, RTT, err := dnsClient.Exchange(&dnsRequest, this.SERVERS[0])
-		if err != nil {
-			_D("error in communicate with resolver, error message: %s", err)
-			http.Error(w, "Server Error", 500)
-			return
-		} else {
-			_D("request took %s", RTT)
-		}
-		if dnsResponse == nil {
-			_D("no response back")
-			http.Error(w, "Server Error:No Recursive response", 500)
-			return
-		}*/
 	dnsResponse, err := DoDNSquery(dnsRequest, TransProString, this.SERVERS, this.timeout)
 	if err != nil {
-		_D("error in communicate with resolver, error message: %s", err)
-		http.Error(w, err.Error(), 500)
+		msg := fmt.Sprintf("Error querying DNS resolver: %s", err)
+		_D("%s", msg)
+		http.Error(w, msg, 500)
 		return
 	}
 	if dnsResponse == nil {
-		_D("no response back")
-		http.Error(w, "Server Error:No Recursive response", 500)
+		msg := "Error querying DNS resolver: no response"
+		_D("%s", msg)
+		http.Error(w, msg, 500)
 		return
 	}
 	response_bytes, err := dnsResponse.Pack()
 	if err != nil {
-		http.Error(w, "Server Error: error packing reply", 500)
-		_D("error in packing request, error message: %s", err)
+		msg := fmt.Sprintf("Error converting DNS message to bytes: %s", err)
+		_D("%s", msg)
+		http.Error(w, msg, 500)
 		return
 	}
 	_, err = w.Write(response_bytes)
 	if err != nil {
-		_D("Can not write response rightly, error message: %s", err)
+		msg := fmt.Sprintf("Error writing HTTP response: %s", err)
+		_D("%s", msg)
 		return
 	}
-	//don't know how to creat a response here
 }
 
 func main() {

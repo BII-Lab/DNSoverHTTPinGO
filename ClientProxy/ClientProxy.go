@@ -193,7 +193,7 @@ func (this ClientProxy) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 
 	postBytesReader := bytes.NewReader(request_bytes)
 
-	ServerInputurl = ServerInputurl + "/proxy_dns"
+	ServerInputurl = ServerInputurl + "/.well-known/dns-wireformat"
 
 	req, err := http.NewRequest("POST", ServerInputurl, postBytesReader) //need add random here in future
 	if err != nil {
